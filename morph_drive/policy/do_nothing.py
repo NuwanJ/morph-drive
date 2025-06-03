@@ -57,11 +57,9 @@ class DoNothingPolicy(PolicyBase):
         No training needed for a do-nothing policy.
         This method is a no-op.
         """
-        pass
 
     def plot(self, *args, **kwargs) -> None:
         """
         No visualization needed for a do-nothing policy.
         This method is a no-op.
         """
-        pass

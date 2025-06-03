@@ -21,3 +21,13 @@ class RandomContinuousPolicy(PolicyBase):
         Select a random action by sampling from the continuous action space.
         """
         return self.action_space.sample()
+
+    def train(self, *args, **kwargs) -> None:
+        """
+        No training needed for a random continuous policy.
+        """
+
+    def plot(self, *args, **kwargs) -> None:
+        """
+        No visualization available for random continuous policy.
+        """
