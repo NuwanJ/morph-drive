@@ -51,3 +51,17 @@ class DoNothingPolicy(PolicyBase):
         Always return the precomputed neutral action.
         """
         return self.neutral_action
+
+    def train(self, *args, **kwargs) -> None:
+        """
+        No training needed for a do-nothing policy.
+        This method is a no-op.
+        """
+        pass
+
+    def plot(self, *args, **kwargs) -> None:
+        """
+        No visualization needed for a do-nothing policy.
+        This method is a no-op.
+        """
+        pass

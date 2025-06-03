@@ -1,23 +1,53 @@
 import unittest
+
 import numpy as np
 
 from morph_drive.rewards.BasicRewardCalculator import BasicRewardCalculator
 
-class TestBasicRewardCalculator(unittest.TestCase):
 
+class TestBasicRewardCalculator(unittest.TestCase):
     def test_calculate_reward_simple(self):
-        calculator = BasicRewardCalculator(target_position=np.array([1, 1, 1]))
-        current_position = np.array([0, 0, 0])
-        reward = calculator.calculate_reward(current_position, None, None, None)
-        # Expected reward is negative distance
-        expected_reward = -np.linalg.norm(current_position - np.array([1,1,1]))
+        target_yaw = 10.0
+        target_pitch = 10.0
+        target_roll = 10.0
+
+        calculator = BasicRewardCalculator(
+            target_orientation=np.array([target_yaw, target_pitch, target_roll])
+        )
+
+        yaw = 120.0
+        pitch = 12.5
+        roll = -1.5
+
+        observation = np.array([yaw, pitch, roll])
+        action = np.array([0, 0, 0])
+
+        reward = calculator.calculate_reward(observation, action)
+        expected_reward = (
+            -abs(yaw - target_yaw),
+            -abs(pitch - target_pitch),
+            -abs(roll - target_roll),
+        )
         self.assertEqual(reward, expected_reward)
 
-    def test_calculate_reward_target_reached(self):
-        calculator = BasicRewardCalculator(target_position=np.array([0.5, 0.5, 0.5]))
-        current_position = np.array([0.5, 0.5, 0.5])
-        reward = calculator.calculate_reward(current_position, None, None, None)
-        self.assertEqual(reward, 0)
+    def test_calculate_reward_simple_when_no_target(self):
+        calculator = BasicRewardCalculator()
 
-if __name__ == '__main__':
+        yaw = 120.0
+        pitch = 12.5
+        roll = -1.5
+
+        observation = np.array([yaw, pitch, roll])
+        action = np.array([0, 0, 0])
+
+        reward = calculator.calculate_reward(observation, action)
+        expected_reward = (
+            yaw,
+            -abs(pitch),
+            -abs(roll),
+        )
+        self.assertEqual(reward, expected_reward)
+
+
+if __name__ == "__main__":
     unittest.main()
