@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "morph-drive"
+version = "0.1.1"
+description = "A package for morph-drive algorithms in origami robotics"
+authors = [{ name = "Nuwan Jaliyagoda", email = "nuwan.jaliyagoda@gmail.com" }]
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.13"
+maintainers = [{ name = "Nuwan Jaliyagoda" }]
+dependencies = [
+    "numpy==2.2.6",
+    "matplotlib==3.10.3",
+    "gymnasium==1.1.1",
+    "gymnasium[classic-control]",
+    "gymnasium[mujoco]",
+    "pyserial==3.5",
+]
