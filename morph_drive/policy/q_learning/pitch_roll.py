@@ -2,6 +2,7 @@ import random
 from typing import Any, Dict, Tuple
 
 import matplotlib.pyplot as plt
+import numpy as np
 
 from ..policy_base import PolicyBase
 
