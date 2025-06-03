@@ -24,3 +24,13 @@ class RandomDiscretePolicy(PolicyBase):
         Select a random action from the discrete action space.
         """
         return self.action_space.sample()
+
+    def train(self, *args, **kwargs) -> None:
+        """
+        No training needed for a random discrete policy.
+        """
+
+    def plot(self, *args, **kwargs) -> None:
+        """
+        No visualization available for random discrete policy.
+        """
