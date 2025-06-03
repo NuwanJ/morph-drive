@@ -1,5 +1,7 @@
 # Origami Robot Algorithms
 
+[![Python CI](https://github.com/NuwanJ/morph-drive/actions/workflows/python-ci.yml/badge.svg)](https://github.com/NuwanJ/morph-drive/actions/workflows/python-ci.yml)
+
 ## About the Project
 
 This Python package offers tools and algorithms for simulating, analyzing, and controlling origami-inspired robotic systems. Origami robotics combines the principles of folding with robotics to create lightweight, scalable, and transformable robots. These systems have applications in fields like surgery, space exploration, manufacturing, and art.
