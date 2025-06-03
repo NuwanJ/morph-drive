@@ -1,6 +1,11 @@
 # Origami Robot Algorithms
 
 [![Python CI](https://github.com/NuwanJ/morph-drive/actions/workflows/python-ci.yml/badge.svg)](https://github.com/NuwanJ/morph-drive/actions/workflows/python-ci.yml)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
+[![Python](https://img.shields.io/badge/python-3.13-blue)](https://www.python.org/downloads/release/python-3130/)
+[![NumPy](https://img.shields.io/badge/numpy-2.2.6-brightgreen)](https://github.com/NuwanJ/morph-drive)
+[![Gymnasium](https://img.shields.io/badge/gymnasium-1.1.1-brightgreen)](https://pypi.org/project/gymnasium/)
+[![MuJoCo](https://img.shields.io/badge/mujoco-3.3.2-brightgreen)](https://pypi.org/project/mujoco/)
 
 ## About the Project
 
