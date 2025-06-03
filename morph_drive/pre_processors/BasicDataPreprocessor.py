@@ -28,10 +28,19 @@ class BasicDataPreprocessor(DataPreprocessorBase):
         # Parse string input (e.g., "yaw,pitch,roll")
         if isinstance(sensor_data, str):
             try:
-                values = list(map(float, sensor_data.split(",")))[0:n]
-            except Exception:
+            # Split the string, take the first n parts, then convert to float
+            parts = sensor_data.split(",")
+            selected_parts = parts[:n]
+            # Ensure we have enough parts, otherwise fill with 0.0
+            values = [float(p) for p in selected_parts]
+            while len(values) < n:
+                values.append(0.0)
+        except ValueError: # More specific exception for float conversion
                 # If parsing fails, default to zero values
                 values = [0.0] * n
+        except Exception:
+            # Catch any other unexpected errors during parsing
+            values = [0.0] * n # Default to zero values
 
         elif isinstance(sensor_data, (list, tuple, np.ndarray)):
             values = [float(x) for x in sensor_data]

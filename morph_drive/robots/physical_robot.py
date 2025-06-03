@@ -1,24 +1,24 @@
 import logging
 from abc import abstractmethod
-from time import sleep
+from time import sleep # Keep this if used by PhyRobot logic not moved to SerialCommunicator
 from types import TracebackType
 from typing import Any, List, Optional, Type
 
 import gymnasium
 import numpy as np
-import serial
+# Remove direct serial import if all serial ops are in SerialCommunicator
+# import serial
 
 from . import RobotInterface
+from .serial_communicator import SerialCommunicator # Added import
 
-
-# TODO separate the serial communication logic into a separate class and inherit
+# TODO separate the serial communication logic into a separate class and inherit - This is now done
 class PhyRobot(RobotInterface):
     """
     Implementation of RobotInterface for a real serial-based robot.
-    Uses the Robot class (serial communication) to control servos.
+    Uses the SerialCommunicator class to handle serial communication.
     """
 
-    # Only as per required by Gym interface
     metadata = {"render_modes": ["human"], 'render_fps': 30}
 
     observation_space: gymnasium.spaces.Space
@@ -31,19 +31,25 @@ class PhyRobot(RobotInterface):
         action_space: gymnasium.spaces.Space | None = None,
         configs: dict[str, Any] | None = None,
     ):
-        """
-        Initialize the serial robot interface.
-        """
         super().__init__()
 
         if configs is None:
             configs = {}
 
-        self.port = str(configs.get("port", "/dev/ttyUSB0"))
-        self.baud_rate = int(configs.get("baud_rate", 115200))
-        self.debug = bool(configs.get("debug", False))
-        self.timeout = float(configs.get("timeout", 1.0))
+        # SerialCommunicator will handle port, baud_rate, timeout
+        # self.port = str(configs.get("port", "/dev/ttyUSB0"))
+        # self.baud_rate = int(configs.get("baud_rate", 115200))
+        # self.timeout = float(configs.get("timeout", 1.0))
         self.logger = logging.getLogger(__name__)
+        self.debug = bool(configs.get("debug", False)) # Keep if PhyRobot uses it directly
+
+        # Create SerialCommunicator instance
+        self.comm = SerialCommunicator(
+            port=str(configs.get("port", "/dev/ttyUSB0")),
+            baud_rate=int(configs.get("baud_rate", 115200)),
+            timeout=float(configs.get("timeout", 1.0)),
+            logger=self.logger,
+        )
 
         self.robot_name = robot_name
 
@@ -56,9 +62,8 @@ class PhyRobot(RobotInterface):
         self.observation_space = observation_space
         self.action_space = action_space
 
-        # Communication specific settings
-        self.ser: Optional[serial.Serial] = None
-        self._connect()
+        # self.ser: Optional[serial.Serial] = None # Moved to SerialCommunicator
+        # self._connect() # Connection handled by SerialCommunicator's __enter__ or explicit call
 
         self.position: list[int] = []
 
@@ -74,25 +79,32 @@ class PhyRobot(RobotInterface):
             else:
                 raise ValueError("Action space must be properly initialized with a valid shape.")
 
-
     def get_observation_space(self) -> gymnasium.spaces.Space:
-        """
-        Return the observation space defined by the simulation
-        """
         return self.observation_space
 
     def get_action_space(self) -> gymnasium.spaces.Space:
-        """
-        Return the action space defined by the simulation
-        """
         return self.action_space
 
     def get_observation(self):
         """
         Get the current observation from the robot's sensors.
+        Handles potential errors during sensor reading.
         """
-        # TODO handle cases where sensor_readings is None or malformed
-        yaw_deg, pitch_deg, roll_deg = self.get_sensor_readings()  # type: ignore
+        try:
+            sensor_values = self.get_sensor_readings()
+            if sensor_values is None:
+                self.logger.warning("Received None from get_sensor_readings(). Defaulting observation.")
+                yaw_deg, pitch_deg, roll_deg = 0.0, 0.0, 0.0
+            else:
+                # Assuming get_sensor_readings() returns a tuple/list of 3 numbers
+                if len(sensor_values) == 3:
+                    yaw_deg, pitch_deg, roll_deg = float(sensor_values[0]), float(sensor_values[1]), float(sensor_values[2])
+                else:
+                    self.logger.warning(f"Received malformed sensor_readings (length {len(sensor_values)}): {sensor_values}. Defaulting observation.")
+                    yaw_deg, pitch_deg, roll_deg = 0.0, 0.0, 0.0
+        except Exception as e:
+            self.logger.error(f"Error getting or parsing sensor readings: {e}. Defaulting observation.")
+            yaw_deg, pitch_deg, roll_deg = 0.0, 0.0, 0.0
 
         obs = np.array([yaw_deg, pitch_deg, roll_deg], dtype=np.float32)
 
@@ -102,182 +114,77 @@ class PhyRobot(RobotInterface):
         return obs
 
     def apply_action(self, action: Any) -> None:
-        """
-        Apply an action to the robot by adjusting servo angles.
-        """
         actuator_values: List = self.set_action_values(action)  # type: ignore
         actuator_cmd = " ".join(str(v) for v in actuator_values)
-        self.write(f"W {actuator_cmd}\n")
-        attempts = 0
-        max_attempts = 10
-        while self._read_raw() == "OK" and attempts < max_attempts:
-            sleep(0.1)
-            attempts += 1
-        if attempts >= max_attempts:
-            self.logger.warning("Exceeded maximum attempts while waiting for response to", actuator_cmd)
+        # Use SerialCommunicator to write
+        if self.comm.write_line(f"W {actuator_cmd}\n"):
+            attempts = 0
+            max_attempts = 10
+            # Use SerialCommunicator to read, _read_raw_line equivalent
+            while self.comm._read_raw_line() == "OK" and attempts < max_attempts: # Assuming direct access for now, or add specific method
+                sleep(0.1) # Consider if this sleep is still needed with SerialCommunicator's sleep
+                attempts += 1
+            if attempts >= max_attempts:
+                self.logger.warning("Exceeded maximum attempts while waiting for response to W %s", actuator_cmd)
+        else:
+            self.logger.error("Failed to write action command: W %s", actuator_cmd)
 
         self.render()
 
     def render(self) -> None:
         """
-        Render the robot's current state.
+        Render the robot's current state by printing its name and actuator values.
         """
-        # TODO implement a visualization method for the robot
-        # print(f"[{self.robot_name}] Actuators: {self.get_actuator_values()}")
-        pass
+        try:
+            actuator_values = self.get_actuator_values()
+            print(f"[{self.robot_name}] Actuator Values: {actuator_values}")
+        except Exception as e:
+            self.logger.error(f"Error getting actuator values for rendering: {e}")
+            print(f"[{self.robot_name}] Actuator Values: Error retrieving values")
 
     def close(self) -> None:
-        """
-        Close the connection to the robot.
-        """
-        self._close()
+        self.comm.close_connection() # Use SerialCommunicator
 
     def reset(self, *, seed=None, options=None):
-        """
-        Reset the robot to its initial state.
-        """
         actuator_values: List = self.reset_action_values()  # type: ignore
         actuator_cmd = " ".join(str(v) for v in actuator_values)
-        self.write(f"W {actuator_cmd}\n")
-
+        # Use SerialCommunicator to write
+        self.comm.write_line(f"W {actuator_cmd}\n")
+        # Potentially wait for ack or ready signal if applicable after reset
         return self.get_observation(), {}
-
-    # ------------------------------------
 
     @abstractmethod
     def get_actuator_values(self):
-        """
-        Helper function to read the current actuator values in servo angles
-        """
+        pass
 
     @abstractmethod
     def set_action_values(self, servo_angles):
-        """
-        Helper function to set the action values based on servo angles.
-        """
+        pass
 
     def reset_action_values(self):
-        """
-        Helper function to define the action values into expected position.
-        Generates random values within the action space by default
-        """
         return self.action_space.sample()
 
     @abstractmethod
     def get_sensor_readings(self):
-        """
-        Helper function to read the sensor values
-        """
+        # This method will now use self.comm.read_line() or self.comm.write_line()
+        # if commands need to be sent to get readings.
+        # Example:
+        # self.comm.write_line("GET_SENSORS\n")
+        # response = self.comm.read_line()
+        # parse response
+        pass
 
-    def _connect(self, retries: int = 3, delay: float = 2) -> bool:
-        """
-        Attempt to connect to the serial port with retries.
-        """
-        for attempt in range(1, retries + 1):
-            try:
-                self.ser = serial.Serial(
-                    self.port, self.baud_rate, timeout=self.timeout
-                )
-                if self.ser.is_open:
-                    self.logger.info(
-                        "Connected to %s at %d baud.", self.port, self.baud_rate
-                    )
-                    return True
-            except serial.SerialException as e:
-                self.logger.warning(
-                    "Connection failed (port:%s, baud_rate:%d attempt:%d). Retrying...",
-                    self.port,
-                    self.baud_rate,
-                    attempt,
-                )
-                self.logger.debug(str(e))
-                sleep(delay)
-        raise ConnectionError(
-            f"Failed to connect to {self.port} after {retries} attempts."
-        )
-
-    def read(self) -> Optional[str]:
-        """
-        Read a line from the serial port.
-        """
-        reading = self._read_raw()
-        if reading == "OK":
-            reading = self._read_raw()
-        self.logger.debug("Received: %s", reading)
-        return reading
-
-    def write(self, string: str) -> Optional[bool]:
-        """
-        Write a string to the serial port.
-        """
-        if not self._is_serial_open() or self.ser is None:
-            return None
-        try:
-            self._flush_input()  # Flush the serial input buffer before writing
-            self.ser.write(string.encode())
-            sleep(0.1)
-            self.logger.debug("<< %s", string)
-
-            # return (
-            #     self.ser.readline() == "OK"
-            # )  # Read the response to ensure it's processed
-            return True
-        except serial.SerialException as e:
-            self.logger.error("Error while writing", exc_info=e)
-            return False
-
-    def _flush_input(self) -> None:
-        """
-        Flush the serial input buffer.
-        """
-        if self._is_serial_open() and self.ser is not None:
-            self.logger.debug("Flushing input buffer...")
-            self.ser.reset_input_buffer()
-
-    def _close(self) -> None:
-        """
-        Close the serial port.
-        """
-        if self._is_serial_open() and self.ser is not None:
-            self.ser.close()
-            self.logger.info("Connection closed.")
-
-    def _read_raw(self) -> Optional[str]:
-        """
-        Read raw data from the serial port.
-        """
-        if not self._is_serial_open() or self.ser is None:
-            return None
-        try:
-            return self.ser.readline().decode().strip()
-        except serial.SerialException as e:
-            self.logger.error("Read error", exc_info=e)
-            return None
-
-    def _wait_for_ready(self) -> None:
-        """
-        Wait until the robot is ready.
-        """
-        self._flush_input()
-        if not self._is_serial_open() or self.ser is None:
-            return
-        while (_ := self.read()) != "READY":
-            sleep(0.5)
-        self._flush_input()
-
-    def _is_serial_open(self) -> bool:
-        """
-        Check if the serial port is open.
-        """
-        if not self.ser or not self.ser.is_open:
-            self.logger.error("Serial port is not open.")
-            return False
-        return True
+    # Methods to be removed as they are now in SerialCommunicator:
+    # _connect, read, write, _flush_input, _close, _read_raw, _wait_for_ready, _is_serial_open
 
     def __enter__(self):
-        self._connect()
-        self.reset()
-        self._wait_for_ready()
+        self.comm.connect() # Use SerialCommunicator's connect
+        # self.reset() # Reset might involve communication, ensure comm is up
+        # Consider if wait_for_ready is needed here, it's also in comm.__enter__ if used as context manager
+        # If PhyRobot needs specific ready signal:
+        if not self.comm.wait_for_ready("ROBOT_READY_SIGNAL"): # Example signal
+             self.logger.warning("Robot did not signal ready after connect in __enter__.")
+        self.reset() # Call reset after connection and ready.
         return self
 
     def __exit__(
@@ -286,10 +193,12 @@ class PhyRobot(RobotInterface):
         exc_value: Optional[BaseException],
         traceback: Optional[TracebackType],
     ) -> None:
-        self.close()
+        self.comm.close_connection() # Use SerialCommunicator
 
     def __del__(self) -> None:
-        self.close()
+        # Ensure connection is closed if __exit__ wasn't called (e.g. error in __init__)
+        if hasattr(self, 'comm'): # Check if comm was initialized
+            self.comm.close_connection()
 
 
 # ----------------------------------

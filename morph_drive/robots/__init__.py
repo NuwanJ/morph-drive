@@ -3,21 +3,6 @@ from typing import Any
 
 import gymnasium as gym
 
-# TODO fix this with modifying the import structure
-
-# # Attempt to import the provided Robot (for real hardware) and MuJoCo environment classes
-# try:
-#     from scripts.robot import Robot  # Real robot control class (serial communication)
-# except ImportError:
-#     Robot = None
-# try:
-#     from env import (
-#         OrigamiTriangularRobotEnv,  # MuJoCo Gymnasium environment for simulation
-#     )
-# except ImportError:
-#     OrigamiTriangularRobotEnv = None
-
-
 class RobotInterface(ABC):
     """Interface for robot control in various environments (real or simulated)."""
 
