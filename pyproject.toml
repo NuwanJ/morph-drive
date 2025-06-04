@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 license = "Apache-2.0"
 
 name = "morph-drive"
-version = "0.2.3"
+version = "0.2.4"
 description = "A package for morph-drive algorithms in origami robotics"
 authors = [{ name = "Nuwan Jaliyagoda", email = "nuwan.jaliyagoda@gmail.com" }]
 readme = "README.md"
