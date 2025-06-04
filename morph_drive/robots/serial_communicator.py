@@ -44,9 +44,8 @@ class SerialCommunicator:
 
     def read_line(self) -> Optional[str]:
         reading = self._read_raw_line()
-        if (
-            reading == "OK"
-        ):  # Assuming "OK" is an acknowledgement, read next line for actual data
+        # Assuming "OK" is an acknowledgement, read next line for actual data
+        if reading == "OK":
             reading = self._read_raw_line()
         self.logger.debug("Received: %s", reading)
         return reading
@@ -57,7 +56,7 @@ class SerialCommunicator:
         try:
             self.flush_input()
             self.ser.write(string.encode())
-            sleep(0.1)  # Give device time to process
+            sleep(0.1)
             self.logger.debug("<< %s", string)
             return True
         except serial.SerialException as e:
@@ -96,12 +95,12 @@ class SerialCommunicator:
 
         start_time = time()
         while (time() - start_time) < timeout_seconds:
-            line = self._read_raw_line()  # Use _read_raw_line to avoid ack processing
+            line = self._read_raw_line()
             if line == ready_signal:
                 self.logger.info("Device is READY.")
-                self.flush_input()  # Flush again after ready signal
+                self.flush_input()
                 return True
-            sleep(0.1)  # Short sleep to prevent busy-waiting
+            sleep(0.1)
 
         self.logger.warning(f"Timeout waiting for '{ready_signal}' signal.")
         return False

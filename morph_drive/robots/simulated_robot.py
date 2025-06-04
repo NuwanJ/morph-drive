@@ -1,12 +1,12 @@
+import logging
 import os
-import logging # Added
 from abc import abstractmethod
-from time import sleep
-from typing import Any # Add Any - already here but ensure it's kept
-import numpy as np # Ensure numpy is imported
-import gymnasium # Ensure gymnasium is imported for spaces
-from gymnasium import utils # Ensure utils is imported for EzPickle
-from gymnasium.envs.mujoco import MujocoEnv  # type: ignore
+from typing import Any
+
+import gymnasium
+import numpy as np
+from gymnasium import utils
+from gymnasium.envs.mujoco import MujocoEnv
 
 from . import RobotInterface
 
@@ -16,8 +16,6 @@ class SimRobot(RobotInterface, MujocoEnv, utils.EzPickle):
     Implementation of RobotInterface for a MuJoCo-based simulation.
     This wraps a Gymnasium MuJoCo environment (e.g., OrigamiTriangularRobotEnv) to simulate the robot.
     """
-
-    # metadata = {"render_modes": ["human"]} # Will be redefined later
 
     observation_space: gymnasium.spaces.Space
     action_space: gymnasium.spaces.Space
@@ -32,7 +30,7 @@ class SimRobot(RobotInterface, MujocoEnv, utils.EzPickle):
         """
         Initialize the simulated robot environment.
         """
-        RobotInterface.__init__(self) # Initialize RobotInterface base
+        RobotInterface.__init__(self)  # Initialize RobotInterface base
 
         if configs is None:
             configs = {}
@@ -40,7 +38,9 @@ class SimRobot(RobotInterface, MujocoEnv, utils.EzPickle):
         xml_file_config = configs.get("xml_file")
         if xml_file_config is None:
             base_dir = os.path.dirname(os.path.abspath(__file__))
-            xml_file = os.path.join(base_dir, "..", "..", "envs", "triangular_robot.xml")
+            xml_file = os.path.join(
+                base_dir, "..", "..", "envs", "triangular_robot.xml"
+            )
         else:
             xml_file = str(xml_file_config)
 
@@ -62,27 +62,39 @@ class SimRobot(RobotInterface, MujocoEnv, utils.EzPickle):
 
         self.render_width = int(configs.get("width", 1280))
         self.render_height = int(configs.get("height", 720))
-        current_frame_skip = int(configs.get("frame_skip", 15)) # Renamed to avoid clash with self.frame_skip from MujocoEnv
+        current_frame_skip = int(
+            configs.get("frame_skip", 15)
+        )  # Renamed to avoid clash with self.frame_skip from MujocoEnv
         self.render_mode = str(configs.get("render_mode", "human"))
 
         self.joint_qpos_indices = [7, 8, 9]
 
-        utils.EzPickle.__init__(self, robot_name=robot_name, observation_space=observation_space, action_space=action_space, configs=configs, model_path=xml_file, frame_skip=current_frame_skip, width=self.render_width, height=self.render_height, render_mode=self.render_mode)
+        utils.EzPickle.__init__(
+            self,
+            robot_name=robot_name,
+            observation_space=observation_space,
+            action_space=action_space,
+            configs=configs,
+            model_path=xml_file,
+            frame_skip=current_frame_skip,
+            width=self.render_width,
+            height=self.render_height,
+            render_mode=self.render_mode,
+        )
 
         MujocoEnv.__init__(
             self,
             model_path=xml_file,
-            frame_skip=current_frame_skip, # Use the frame_skip from configs
+            frame_skip=current_frame_skip,
             observation_space=observation_space,
             render_mode=self.render_mode,
             width=self.render_width,
             height=self.render_height,
         )
-        # Note: self.frame_skip is now set by MujocoEnv's __init__
 
         self.metadata = {
             "render_modes": [self.render_mode, "rgb_array"],
-            "render_fps": int(np.round(1.0 / self.dt)), # self.dt is set by MujocoEnv
+            "render_fps": int(np.round(1.0 / self.dt)),
         }
 
         self.position: list[int] = []
@@ -91,22 +103,35 @@ class SimRobot(RobotInterface, MujocoEnv, utils.EzPickle):
             if isinstance(init_pos_config, (list, tuple)):
                 self.position = [int(v) for v in init_pos_config]
             else:
-                raise ValueError("Invalid type for 'init_position'. Expected list or tuple.")
+                raise ValueError(
+                    "Invalid type for 'init_position'. Expected list or tuple."
+                )
         else:
             if self.action_space:
                 if isinstance(self.action_space, gymnasium.spaces.MultiDiscrete):
                     self.position = [0] * len(self.action_space.nvec)
-                elif isinstance(self.action_space, gymnasium.spaces.Box) or isinstance(self.action_space, gymnasium.spaces.Discrete):
-                    if self.action_space.shape is not None and len(self.action_space.shape) > 0:
-                         self.position = [0] * self.action_space.shape[0]
-                    elif not self.action_space.shape: # Discrete, shape is ()
-                         self.position = [0]
+                elif isinstance(self.action_space, gymnasium.spaces.Box) or isinstance(
+                    self.action_space, gymnasium.spaces.Discrete
+                ):
+                    if (
+                        self.action_space.shape is not None
+                        and len(self.action_space.shape) > 0
+                    ):
+                        self.position = [0] * self.action_space.shape[0]
+                    elif not self.action_space.shape:
+                        self.position = [0]
                     else:
-                        self.logger.warning("Could not determine action space shape for default init_position.")
+                        self.logger.warning(
+                            "Could not determine action space shape for default init_position."
+                        )
                 else:
-                    self.logger.warning("Unsupported action space type for default init_position.")
+                    self.logger.warning(
+                        "Unsupported action space type for default init_position."
+                    )
             else:
-                self.logger.warning("Action space not available for default init_position.")
+                self.logger.warning(
+                    "Action space not available for default init_position."
+                )
 
     def get_observation_space(self) -> gymnasium.spaces.Space:
         """
@@ -159,22 +184,28 @@ class SimRobot(RobotInterface, MujocoEnv, utils.EzPickle):
 
         actuator_values = self.set_action_values(action)
 
-        if hasattr(self, 'model') and self.model:
+        if hasattr(self, "model") and self.model:
             try:
                 # Ensure joint names match your XML. These are examples.
-                joint1_qposadr = self.model.joint('joint1').qposadr[0]
-                joint2_qposadr = self.model.joint('joint2').qposadr[0]
-                joint3_qposadr = self.model.joint('joint3').qposadr[0]
-                self.joint_qpos_indices = [joint1_qposadr, joint2_qposadr, joint3_qposadr]
+                joint1_qposadr = self.model.joint("joint1").qposadr[0]
+                joint2_qposadr = self.model.joint("joint2").qposadr[0]
+                joint3_qposadr = self.model.joint("joint3").qposadr[0]
+                self.joint_qpos_indices = [
+                    joint1_qposadr,
+                    joint2_qposadr,
+                    joint3_qposadr,
+                ]
             except Exception as e:
-                self.logger.error(f"Could not get joint qpos addresses dynamically in apply_action: {e}. Using fallback {self.joint_qpos_indices}.")
+                self.logger.error(
+                    f"Could not get joint qpos addresses dynamically in apply_action: {e}. Using fallback {self.joint_qpos_indices}."
+                )
 
         target_positions = np.array(actuator_values, dtype=np.float64)
 
         max_iterations = 300
         tolerance = 1.5  # Degrees
 
-        for _i in range(max_iterations): # Use _i if i is not used
+        for _i in range(max_iterations):
             self.do_simulation(ctrl=target_positions, n_frames=1)
             current_positions = self.data.qpos[self.joint_qpos_indices]
 
@@ -199,36 +230,31 @@ class SimRobot(RobotInterface, MujocoEnv, utils.EzPickle):
         """
         Reset the simulation to its desired initial state.
         """
-        # Gymnasium's base method to handle seeding
-        # super().reset(seed=seed, options=options) # MujocoEnv handles seeding. options is for specific reset options.
-        # MujocoEnv.reset already calls self.mujoco_renderer.reset() if needed.
-        # It also handles self.data.reset() or similar.
-
         actuator_values = self.reset_action_values()
 
-        if hasattr(self, 'model') and self.model:
+        if hasattr(self, "model") and self.model:
             try:
-                joint1_qposadr = self.model.joint('joint1').qposadr[0]
-                joint2_qposadr = self.model.joint('joint2').qposadr[0]
-                joint3_qposadr = self.model.joint('joint3').qposadr[0]
-                self.joint_qpos_indices = [joint1_qposadr, joint2_qposadr, joint3_qposadr]
+                joint1_qposadr = self.model.joint("joint1").qposadr[0]
+                joint2_qposadr = self.model.joint("joint2").qposadr[0]
+                joint3_qposadr = self.model.joint("joint3").qposadr[0]
+                self.joint_qpos_indices = [
+                    joint1_qposadr,
+                    joint2_qposadr,
+                    joint3_qposadr,
+                ]
             except Exception as e:
-                self.logger.error(f"Could not get joint qpos addresses dynamically in reset: {e}. Using fallback {self.joint_qpos_indices}.")
+                self.logger.error(
+                    f"Could not get joint qpos addresses dynamically in reset: {e}. Using fallback {self.joint_qpos_indices}."
+                )
 
         target_positions = np.array(actuator_values, dtype=np.float64)
 
         max_iterations = 300
         tolerance = 1.5  # Degrees
 
-        # Call MujocoEnv's reset first to reset simulation state properly
-        # obs_mj = MujocoEnv.reset(self, seed=seed, options=options) # This returns obs, info
-        # However, we need to set our specific joint positions *after* the general reset.
-        # So, we reset qpos and qvel directly if needed, or use controls.
-        # For now, relying on do_simulation to drive to target.
+        MujocoEnv.reset(self, seed=seed, options=options)  # Standard reset
 
-        MujocoEnv.reset(self, seed=seed, options=options) # Standard reset
-
-        for _i in range(max_iterations): # Use _i if i is not used
+        for _i in range(max_iterations):  # Use _i if i is not used
             self.do_simulation(ctrl=target_positions, n_frames=1)
             current_positions = self.data.qpos[self.joint_qpos_indices]
 

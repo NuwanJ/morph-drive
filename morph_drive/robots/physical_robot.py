@@ -1,25 +1,23 @@
 import logging
 from abc import abstractmethod
-from time import sleep # Keep this if used by PhyRobot logic not moved to SerialCommunicator
+from time import sleep
 from types import TracebackType
 from typing import Any, List, Optional, Type
 
 import gymnasium
 import numpy as np
-# Remove direct serial import if all serial ops are in SerialCommunicator
-# import serial
 
 from . import RobotInterface
-from .serial_communicator import SerialCommunicator # Added import
+from .serial_communicator import SerialCommunicator
 
-# TODO separate the serial communication logic into a separate class and inherit - This is now done
+
 class PhyRobot(RobotInterface):
     """
     Implementation of RobotInterface for a real serial-based robot.
     Uses the SerialCommunicator class to handle serial communication.
     """
 
-    metadata = {"render_modes": ["human"], 'render_fps': 30}
+    metadata = {"render_modes": ["human"], "render_fps": 30}
 
     observation_space: gymnasium.spaces.Space
     action_space: gymnasium.spaces.Space
@@ -36,12 +34,10 @@ class PhyRobot(RobotInterface):
         if configs is None:
             configs = {}
 
-        # SerialCommunicator will handle port, baud_rate, timeout
-        # self.port = str(configs.get("port", "/dev/ttyUSB0"))
-        # self.baud_rate = int(configs.get("baud_rate", 115200))
-        # self.timeout = float(configs.get("timeout", 1.0))
         self.logger = logging.getLogger(__name__)
-        self.debug = bool(configs.get("debug", False)) # Keep if PhyRobot uses it directly
+        self.debug = bool(
+            configs.get("debug", False)
+        )  # Keep if PhyRobot uses it directly
 
         # Create SerialCommunicator instance
         self.comm = SerialCommunicator(
@@ -72,12 +68,16 @@ class PhyRobot(RobotInterface):
             if isinstance(init_position, (list, tuple)):
                 self.position = [int(v) for v in init_position]
             else:
-                raise ValueError("Invalid type for 'init_position'. Expected list, or tuple.")
+                raise ValueError(
+                    "Invalid type for 'init_position'. Expected list, or tuple."
+                )
         else:
-            if self.action_space and hasattr(self.action_space, 'shape'):
+            if self.action_space and hasattr(self.action_space, "shape"):
                 self.position = [0] * self.action_space.shape[0]  # type: ignore
             else:
-                raise ValueError("Action space must be properly initialized with a valid shape.")
+                raise ValueError(
+                    "Action space must be properly initialized with a valid shape."
+                )
 
     def get_observation_space(self) -> gymnasium.spaces.Space:
         return self.observation_space
@@ -93,17 +93,27 @@ class PhyRobot(RobotInterface):
         try:
             sensor_values = self.get_sensor_readings()
             if sensor_values is None:
-                self.logger.warning("Received None from get_sensor_readings(). Defaulting observation.")
+                self.logger.warning(
+                    "Received None from get_sensor_readings(). Defaulting observation."
+                )
                 yaw_deg, pitch_deg, roll_deg = 0.0, 0.0, 0.0
             else:
                 # Assuming get_sensor_readings() returns a tuple/list of 3 numbers
                 if len(sensor_values) == 3:
-                    yaw_deg, pitch_deg, roll_deg = float(sensor_values[0]), float(sensor_values[1]), float(sensor_values[2])
+                    yaw_deg, pitch_deg, roll_deg = (
+                        float(sensor_values[0]),
+                        float(sensor_values[1]),
+                        float(sensor_values[2]),
+                    )
                 else:
-                    self.logger.warning(f"Received malformed sensor_readings (length {len(sensor_values)}): {sensor_values}. Defaulting observation.")
+                    self.logger.warning(
+                        f"Received malformed sensor_readings (length {len(sensor_values)}): {sensor_values}. Defaulting observation."
+                    )
                     yaw_deg, pitch_deg, roll_deg = 0.0, 0.0, 0.0
         except Exception as e:
-            self.logger.error(f"Error getting or parsing sensor readings: {e}. Defaulting observation.")
+            self.logger.error(
+                f"Error getting or parsing sensor readings: {e}. Defaulting observation."
+            )
             yaw_deg, pitch_deg, roll_deg = 0.0, 0.0, 0.0
 
         obs = np.array([yaw_deg, pitch_deg, roll_deg], dtype=np.float32)
@@ -116,16 +126,18 @@ class PhyRobot(RobotInterface):
     def apply_action(self, action: Any) -> None:
         actuator_values: List = self.set_action_values(action)  # type: ignore
         actuator_cmd = " ".join(str(v) for v in actuator_values)
-        # Use SerialCommunicator to write
+
         if self.comm.write_line(f"W {actuator_cmd}\n"):
             attempts = 0
             max_attempts = 10
-            # Use SerialCommunicator to read, _read_raw_line equivalent
-            while self.comm._read_raw_line() == "OK" and attempts < max_attempts: # Assuming direct access for now, or add specific method
-                sleep(0.1) # Consider if this sleep is still needed with SerialCommunicator's sleep
+            while self.comm._read_raw_line() == "OK" and attempts < max_attempts:
+                sleep(0.1)
                 attempts += 1
             if attempts >= max_attempts:
-                self.logger.warning("Exceeded maximum attempts while waiting for response to W %s", actuator_cmd)
+                self.logger.warning(
+                    "Exceeded maximum attempts while waiting for response to W %s",
+                    actuator_cmd,
+                )
         else:
             self.logger.error("Failed to write action command: W %s", actuator_cmd)
 
@@ -143,14 +155,12 @@ class PhyRobot(RobotInterface):
             print(f"[{self.robot_name}] Actuator Values: Error retrieving values")
 
     def close(self) -> None:
-        self.comm.close_connection() # Use SerialCommunicator
+        self.comm.close_connection()  # Use SerialCommunicator
 
     def reset(self, *, seed=None, options=None):
         actuator_values: List = self.reset_action_values()  # type: ignore
         actuator_cmd = " ".join(str(v) for v in actuator_values)
-        # Use SerialCommunicator to write
         self.comm.write_line(f"W {actuator_cmd}\n")
-        # Potentially wait for ack or ready signal if applicable after reset
         return self.get_observation(), {}
 
     @abstractmethod
@@ -166,25 +176,18 @@ class PhyRobot(RobotInterface):
 
     @abstractmethod
     def get_sensor_readings(self):
-        # This method will now use self.comm.read_line() or self.comm.write_line()
-        # if commands need to be sent to get readings.
-        # Example:
-        # self.comm.write_line("GET_SENSORS\n")
-        # response = self.comm.read_line()
-        # parse response
+        """
+        Get the raw sensor readings from the robot.
+        """
         pass
 
-    # Methods to be removed as they are now in SerialCommunicator:
-    # _connect, read, write, _flush_input, _close, _read_raw, _wait_for_ready, _is_serial_open
-
     def __enter__(self):
-        self.comm.connect() # Use SerialCommunicator's connect
-        # self.reset() # Reset might involve communication, ensure comm is up
-        # Consider if wait_for_ready is needed here, it's also in comm.__enter__ if used as context manager
-        # If PhyRobot needs specific ready signal:
-        if not self.comm.wait_for_ready("ROBOT_READY_SIGNAL"): # Example signal
-             self.logger.warning("Robot did not signal ready after connect in __enter__.")
-        self.reset() # Call reset after connection and ready.
+        self.comm.connect()
+        if not self.comm.wait_for_ready("RREADY"):
+            self.logger.warning(
+                "Robot did not signal ready after connect in __enter__."
+            )
+        self.reset()  # Call reset after connection and ready.
         return self
 
     def __exit__(
@@ -193,11 +196,11 @@ class PhyRobot(RobotInterface):
         exc_value: Optional[BaseException],
         traceback: Optional[TracebackType],
     ) -> None:
-        self.comm.close_connection() # Use SerialCommunicator
+        self.comm.close_connection()  # Use SerialCommunicator
 
     def __del__(self) -> None:
         # Ensure connection is closed if __exit__ wasn't called (e.g. error in __init__)
-        if hasattr(self, 'comm'): # Check if comm was initialized
+        if hasattr(self, "comm"):  # Check if comm was initialized
             self.comm.close_connection()
 
 
