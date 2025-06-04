@@ -1,10 +1,15 @@
 import logging
-import serial
 from time import sleep, time
-from typing import Optional, Type, TracebackType
+from types import TracebackType
+from typing import Optional, Type
+
+import serial
+
 
 class SerialCommunicator:
-    def __init__(self, port: str, baud_rate: int, timeout: float, logger: logging.Logger):
+    def __init__(
+        self, port: str, baud_rate: int, timeout: float, logger: logging.Logger
+    ):
         self.port = port
         self.baud_rate = baud_rate
         self.timeout = timeout
@@ -31,6 +36,7 @@ class SerialCommunicator:
                 )
                 self.logger.debug(str(e))
                 sleep(delay)
+
         # Raise ConnectionError if all retries fail
         raise ConnectionError(
             f"Failed to connect to {self.port} after {retries} attempts."
@@ -38,7 +44,9 @@ class SerialCommunicator:
 
     def read_line(self) -> Optional[str]:
         reading = self._read_raw_line()
-        if reading == "OK": # Assuming "OK" is an acknowledgement, read next line for actual data
+        if (
+            reading == "OK"
+        ):  # Assuming "OK" is an acknowledgement, read next line for actual data
             reading = self._read_raw_line()
         self.logger.debug("Received: %s", reading)
         return reading
@@ -49,10 +57,8 @@ class SerialCommunicator:
         try:
             self.flush_input()
             self.ser.write(string.encode())
-            sleep(0.1) # Give device time to process
+            sleep(0.1)  # Give device time to process
             self.logger.debug("<< %s", string)
-            # Optional: Check for an "OK" or ack response if your device sends one
-            # For now, assume write is successful if no exception
             return True
         except serial.SerialException as e:
             self.logger.error("Error while writing", exc_info=e)
@@ -81,33 +87,32 @@ class SerialCommunicator:
             self.logger.error("Unicode decode error on read", exc_info=e)
             return None
 
-
-    def wait_for_ready(self, ready_signal: str = "READY", timeout_seconds: float = 10.0) -> bool:
+    def wait_for_ready(
+        self, ready_signal: str = "READY", timeout_seconds: float = 10.0
+    ) -> bool:
         self.flush_input()
         if not self.is_open() or self.ser is None:
             return False
 
-        start_time = time.time()
-        while (time.time() - start_time) < timeout_seconds:
-            line = self._read_raw_line() # Use _read_raw_line to avoid ack processing
+        start_time = time()
+        while (time() - start_time) < timeout_seconds:
+            line = self._read_raw_line()  # Use _read_raw_line to avoid ack processing
             if line == ready_signal:
                 self.logger.info("Device is READY.")
-                self.flush_input() # Flush again after ready signal
+                self.flush_input()  # Flush again after ready signal
                 return True
-            sleep(0.1) # Short sleep to prevent busy-waiting
+            sleep(0.1)  # Short sleep to prevent busy-waiting
 
         self.logger.warning(f"Timeout waiting for '{ready_signal}' signal.")
         return False
 
     def is_open(self) -> bool:
         if not self.ser or not self.ser.is_open:
-            # self.logger.error("Serial port is not open.") # This can be too noisy
             return False
         return True
 
     def __enter__(self):
         self.connect()
-        # self.wait_for_ready() # Consider if wait_for_ready should always be here or called explicitly
         return self
 
     def __exit__(
