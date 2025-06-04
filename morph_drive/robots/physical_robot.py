@@ -17,6 +17,7 @@ class PhyRobot(RobotInterface):
     Uses the SerialCommunicator class to handle serial communication.
     """
 
+    # Only as per required by Gym interface
     metadata = {"render_modes": ["human"], "render_fps": 30}
 
     observation_space: gymnasium.spaces.Space
@@ -24,7 +25,7 @@ class PhyRobot(RobotInterface):
 
     def __init__(
         self,
-        robot_name: str = "SimRobot",
+        robot_name: str = "PhyRobot",
         observation_space: gymnasium.spaces.Space | None = None,
         action_space: gymnasium.spaces.Space | None = None,
         configs: dict[str, Any] | None = None,
@@ -35,9 +36,7 @@ class PhyRobot(RobotInterface):
             configs = {}
 
         self.logger = logging.getLogger(__name__)
-        self.debug = bool(
-            configs.get("debug", False)
-        )  # Keep if PhyRobot uses it directly
+        self.debug = bool(configs.get("debug", False))
 
         # Create SerialCommunicator instance
         self.comm = SerialCommunicator(
@@ -57,9 +56,6 @@ class PhyRobot(RobotInterface):
 
         self.observation_space = observation_space
         self.action_space = action_space
-
-        # self.ser: Optional[serial.Serial] = None # Moved to SerialCommunicator
-        # self._connect() # Connection handled by SerialCommunicator's __enter__ or explicit call
 
         self.position: list[int] = []
 
@@ -155,7 +151,7 @@ class PhyRobot(RobotInterface):
             print(f"[{self.robot_name}] Actuator Values: Error retrieving values")
 
     def close(self) -> None:
-        self.comm.close_connection()  # Use SerialCommunicator
+        self.comm.close_connection()
 
     def reset(self, *, seed=None, options=None):
         actuator_values: List = self.reset_action_values()  # type: ignore
@@ -187,7 +183,8 @@ class PhyRobot(RobotInterface):
             self.logger.warning(
                 "Robot did not signal ready after connect in __enter__."
             )
-        self.reset()  # Call reset after connection and ready.
+        # Call reset after connection and ready.
+        self.reset()
         return self
 
     def __exit__(
@@ -196,112 +193,9 @@ class PhyRobot(RobotInterface):
         exc_value: Optional[BaseException],
         traceback: Optional[TracebackType],
     ) -> None:
-        self.comm.close_connection()  # Use SerialCommunicator
+        # Use SerialCommunicator
+        self.comm.close_connection()
 
     def __del__(self) -> None:
-        # Ensure connection is closed if __exit__ wasn't called (e.g. error in __init__)
-        if hasattr(self, "comm"):  # Check if comm was initialized
+        if hasattr(self, "comm"):
             self.comm.close_connection()
-
-
-# ----------------------------------
-# def reset(self) -> None:
-#     """
-#     Reset the robot to the default position (as defined in Robot.reset_position).
-#     """
-#     if self.robot is None:
-#         return
-
-#     # Reset servos to initial positions (Robot.reset sends servos to reset_position and returns those angles)
-#     initial_angles = self.robot.reset()  # e.g., [65, 65, 65]
-#     self._m1_angle, self._m2_angle, self._m3_angle = initial_angles
-
-#     # Allow time for the robot to reach the position and stabilize
-#     time.sleep(1.0)
-
-#     # Flush any buffered input data from the robot
-#     self.robot.flush_input()
-
-# def apply_action(self, action: Any) -> None:
-#     """
-#     Apply a discrete action to the robot by adjusting servo angles.
-#     """
-
-#     # Ensure action has three components
-#     try:
-#         a0, a1, a2 = action
-#     except Exception as e:
-#         raise ValueError(
-#             "Action must be an iterable of three values (for 3 servos)."
-#         ) from e
-
-#     # Map each discrete value {0,1,2} to an increment {-1,0,+1}
-#     increments = [int(val) - 1 for val in (a0, a1, a2)]
-
-#     # Define servo step size in degrees for each increment unit
-#     servo_step = (
-#         -3
-#     )  # using a negative step so that 0->+1 increment, 2->-1 increment (per design choice)
-
-#     # Update each servo angle and clamp within safe bounds [45, 110] degrees
-#     self._m1_angle = int(
-#         np.clip(self._m1_angle + increments[0] * servo_step, 45, 110)
-#     )
-#     self._m2_angle = int(
-#         np.clip(self._m2_angle + increments[1] * servo_step, 45, 110)
-#     )
-#     self._m3_angle = int(
-#         np.clip(self._m3_angle + increments[2] * servo_step, 45, 110)
-#     )
-
-#     # Send the movement command to the physical robot
-#     # (non-blocking or blocking until move complete as implemented in Robot)
-#     self.robot.send_movement(self._m1_angle, self._m2_angle, self._m3_angle)
-
-#     # TODO handle this
-
-#     # # Store the returns from the step
-#     # self._last_obs = obs
-#     # self._reward = reward
-#     # self._done = done
-#     # self._truncated = truncated
-#     # self._info = info
-
-# def get_sensor_data(self) -> str | None:
-#     """
-#     Retrieve raw sensor readings from the robot (e.g., yaw, pitch, roll angles as a comma-separated string).
-#     """
-#     if self.robot is None:
-#         return None
-
-#     # Send command to retrieve orientation data (assuming "C2" triggers the robot to respond with yaw,pitch,roll)
-#     return self.robot.send_command_return_response("C2")
-
-# def close(self) -> None:
-#     """
-#     Close the connection to the robot.
-#     """
-#     if self.robot:
-#         self.robot.close()
-
-# def render(self) -> None:
-#     """
-#     For a real robot, print the current servo angles as a simple form of feedback.
-#     """
-#     print(
-#         f"[Robot] Servo angles: M1={self._m1_angle}, M2={self._m2_angle}, M3={self._m3_angle}"
-#     )
-
-
-# def send_command_return_response(self, command: str) -> Optional[str]:
-#     """Send a command and return the response."""
-#     self.write(f"{command}\n")
-#     return self.read()
-
-# def send_movement(self, value_1: int, value_2: int, value_3: int) -> None:
-#     """Send a movement command."""
-#     self.write(f"W {value_1} {value_2} {value_3}\n")
-#     while self._read_raw() == "OK":
-#         sleep(0.1)
-#         sleep(0.1)
-#         sleep(0.1)

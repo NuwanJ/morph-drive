@@ -6,7 +6,7 @@ from typing import Any
 import gymnasium
 import numpy as np
 from gymnasium import utils
-from gymnasium.envs.mujoco import MujocoEnv
+from gymnasium.envs.mujoco import MujocoEnv  # type: ignore
 
 from . import RobotInterface
 
@@ -30,7 +30,9 @@ class SimRobot(RobotInterface, MujocoEnv, utils.EzPickle):
         """
         Initialize the simulated robot environment.
         """
-        RobotInterface.__init__(self)  # Initialize RobotInterface base
+
+        # Initialize RobotInterface base
+        RobotInterface.__init__(self)
 
         if configs is None:
             configs = {}
@@ -38,9 +40,7 @@ class SimRobot(RobotInterface, MujocoEnv, utils.EzPickle):
         xml_file_config = configs.get("xml_file")
         if xml_file_config is None:
             base_dir = os.path.dirname(os.path.abspath(__file__))
-            xml_file = os.path.join(
-                base_dir, "..", "..", "envs", "triangular_robot.xml"
-            )
+            xml_file = os.path.join(base_dir, "env.xml")
         else:
             xml_file = str(xml_file_config)
 
