@@ -1,6 +1,6 @@
+import logging
 import os
 from abc import abstractmethod
-from time import sleep
 from typing import Any
 
 import gymnasium
@@ -17,8 +17,6 @@ class SimRobot(RobotInterface, MujocoEnv, utils.EzPickle):
     This wraps a Gymnasium MuJoCo environment (e.g., OrigamiTriangularRobotEnv) to simulate the robot.
     """
 
-    metadata = {"render_modes": ["human"]}
-
     observation_space: gymnasium.spaces.Space
     action_space: gymnasium.spaces.Space
 
@@ -27,22 +25,24 @@ class SimRobot(RobotInterface, MujocoEnv, utils.EzPickle):
         robot_name: str = "SimRobot",
         observation_space: gymnasium.spaces.Space | None = None,
         action_space: gymnasium.spaces.Space | None = None,
-        configs: dict[str, str | int] | None = None,
-        **kwargs,
+        configs: dict[str, Any] | None = None,
     ):
         """
         Initialize the simulated robot environment.
         """
-        super().__init__()
+
+        # Initialize RobotInterface base
+        RobotInterface.__init__(self)
 
         if configs is None:
             configs = {}
 
-        # debug = configs.get("debug", False)
-
-        xml_file = str(configs.get("xml_file", None))
-        if xml_file is None:
-            xml_file = os.path.join(os.path.dirname(__file__), "env.xml")
+        xml_file_config = configs.get("xml_file")
+        if xml_file_config is None:
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            xml_file = os.path.join(base_dir, "env.xml")
+        else:
+            xml_file = str(xml_file_config)
 
         if not os.path.isfile(xml_file):
             raise FileNotFoundError(
@@ -50,65 +50,88 @@ class SimRobot(RobotInterface, MujocoEnv, utils.EzPickle):
             )
 
         self.robot_name = robot_name
+        self.logger = logging.getLogger(__name__)
 
         if observation_space is None:
-            raise ValueError("Observation space must be provided.")
-
+            raise ValueError("Observation space must be provided for SimRobot.")
         if action_space is None:
-            raise ValueError("Action space must be provided.")
-
-        # Rendering configs
-        self.render_width = int(configs.get("width", 1280))
-        self.render_height = int(configs.get("height", 720))
-        self.render_frame_skip = int(configs.get("frame_skip", 15))
-        self.render_mode = str(configs.get("render_mode", "human"))
-
-        # Initialize the MujocoEnv with the model.
-        utils.EzPickle.__init__(self, xml_file, **kwargs)
-
-        # https://mujoco.readthedocs.io/en/stable/APIreference/APItypes.html#mjvoption
-        visual_options: dict[int, bool] = {}
-
-        MujocoEnv.__init__(
-            self,
-            model_path=xml_file,
-            frame_skip=self.render_frame_skip,
-            width=self.render_width,
-            height=self.render_height,
-            observation_space=observation_space,
-            render_mode=self.render_mode,
-            visual_options=visual_options,
-            **kwargs,
-        )
-
-        self.metadata = {
-            "render_modes": [self.render_mode],
-            "render_fps": int(np.round(1.0 / self.dt)),
-        }
+            raise ValueError("Action space must be provided for SimRobot.")
 
         self.observation_space = observation_space
         self.action_space = action_space
 
-        # (Optionally) one could also configure a reward range or other properties here.
-        # self.reward_range = (-float('inf'), float('inf'))
+        self.render_width = int(configs.get("width", 1280))
+        self.render_height = int(configs.get("height", 720))
+        current_frame_skip = int(
+            configs.get("frame_skip", 15)
+        )  # Renamed to avoid clash with self.frame_skip from MujocoEnv
+        self.render_mode = str(configs.get("render_mode", "human"))
 
-        # # Environment specification, typically set by gymnasium when registered.
-        # self.spec = None
+        self.joint_qpos_indices = [7, 8, 9]
+
+        utils.EzPickle.__init__(
+            self,
+            robot_name=robot_name,
+            observation_space=observation_space,
+            action_space=action_space,
+            configs=configs,
+            model_path=xml_file,
+            frame_skip=current_frame_skip,
+            width=self.render_width,
+            height=self.render_height,
+            render_mode=self.render_mode,
+        )
+
+        MujocoEnv.__init__(
+            self,
+            model_path=xml_file,
+            frame_skip=current_frame_skip,
+            observation_space=observation_space,
+            render_mode=self.render_mode,
+            width=self.render_width,
+            height=self.render_height,
+        )
+
+        self.metadata = {
+            "render_modes": [self.render_mode, "rgb_array"],
+            "render_fps": int(np.round(1.0 / self.dt)),
+        }
 
         self.position: list[int] = []
-
-        if configs.get("init_position"):
-            init_position = configs.get("init_position")
-            if isinstance(init_position, (list, tuple)):
-                self.position = [int(v) for v in init_position]
+        init_pos_config = configs.get("init_position")
+        if init_pos_config:
+            if isinstance(init_pos_config, (list, tuple)):
+                self.position = [int(v) for v in init_pos_config]
             else:
-                raise ValueError("Invalid type for 'init_position'. Expected list, or tuple.")
+                raise ValueError(
+                    "Invalid type for 'init_position'. Expected list or tuple."
+                )
         else:
-            if self.action_space and hasattr(self.action_space, 'shape'):
-                self.position = [0] * self.action_space.shape[0] # type: ignore
+            if self.action_space:
+                if isinstance(self.action_space, gymnasium.spaces.MultiDiscrete):
+                    self.position = [0] * len(self.action_space.nvec)
+                elif isinstance(self.action_space, gymnasium.spaces.Box) or isinstance(
+                    self.action_space, gymnasium.spaces.Discrete
+                ):
+                    if (
+                        self.action_space.shape is not None
+                        and len(self.action_space.shape) > 0
+                    ):
+                        self.position = [0] * self.action_space.shape[0]
+                    elif not self.action_space.shape:
+                        self.position = [0]
+                    else:
+                        self.logger.warning(
+                            "Could not determine action space shape for default init_position."
+                        )
+                else:
+                    self.logger.warning(
+                        "Unsupported action space type for default init_position."
+                    )
             else:
-                raise ValueError("Action space must be properly initialized with a valid shape.")
-
+                self.logger.warning(
+                    "Action space not available for default init_position."
+                )
 
     def get_observation_space(self) -> gymnasium.spaces.Space:
         """
@@ -161,13 +184,35 @@ class SimRobot(RobotInterface, MujocoEnv, utils.EzPickle):
 
         actuator_values = self.set_action_values(action)
 
-        # Execute the action in the simulation.
-        for i in range(10):
-            # TODO implement a while loop to reach the desired position rather than using 10 steps
-            self.render()
-            self.do_simulation(ctrl=actuator_values, n_frames=self.frame_skip)
-            self.render()
-            sleep(self.dt)
+        if hasattr(self, "model") and self.model:
+            try:
+                # Ensure joint names match your XML. These are examples.
+                joint1_qposadr = self.model.joint("joint1").qposadr[0]
+                joint2_qposadr = self.model.joint("joint2").qposadr[0]
+                joint3_qposadr = self.model.joint("joint3").qposadr[0]
+                self.joint_qpos_indices = [
+                    joint1_qposadr,
+                    joint2_qposadr,
+                    joint3_qposadr,
+                ]
+            except Exception as e:
+                self.logger.error(
+                    f"Could not get joint qpos addresses dynamically in apply_action: {e}. Using fallback {self.joint_qpos_indices}."
+                )
+
+        target_positions = np.array(actuator_values, dtype=np.float64)
+
+        max_iterations = 300
+        tolerance = 1.5  # Degrees
+
+        for _i in range(max_iterations):
+            self.do_simulation(ctrl=target_positions, n_frames=1)
+            current_positions = self.data.qpos[self.joint_qpos_indices]
+
+            if np.allclose(current_positions, target_positions, atol=tolerance):
+                break
+
+        self.render()
 
     def render(self) -> None:
         """
@@ -185,19 +230,38 @@ class SimRobot(RobotInterface, MujocoEnv, utils.EzPickle):
         """
         Reset the simulation to its desired initial state.
         """
-        # Gymnasium's base method to handle seeding
-        super().reset(seed=None, options=None)
-
-        # Reset robot with its initiate / reset position
         actuator_values = self.reset_action_values()
 
-        # Reach the destination in several steps
-        for _ in range(10):
-            self.do_simulation(ctrl=actuator_values, n_frames=self.frame_skip)
-            self.render()
-            sleep(self.dt)
+        if hasattr(self, "model") and self.model:
+            try:
+                joint1_qposadr = self.model.joint("joint1").qposadr[0]
+                joint2_qposadr = self.model.joint("joint2").qposadr[0]
+                joint3_qposadr = self.model.joint("joint3").qposadr[0]
+                self.joint_qpos_indices = [
+                    joint1_qposadr,
+                    joint2_qposadr,
+                    joint3_qposadr,
+                ]
+            except Exception as e:
+                self.logger.error(
+                    f"Could not get joint qpos addresses dynamically in reset: {e}. Using fallback {self.joint_qpos_indices}."
+                )
 
-        # Gymnasium reset should return (obs, info)
+        target_positions = np.array(actuator_values, dtype=np.float64)
+
+        max_iterations = 300
+        tolerance = 1.5  # Degrees
+
+        MujocoEnv.reset(self, seed=seed, options=options)  # Standard reset
+
+        for _i in range(max_iterations):  # Use _i if i is not used
+            self.do_simulation(ctrl=target_positions, n_frames=1)
+            current_positions = self.data.qpos[self.joint_qpos_indices]
+
+            if np.allclose(current_positions, target_positions, atol=tolerance):
+                break
+
+        self.render()
         return self.get_observation(), {}
 
     # ------------------------------------

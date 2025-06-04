@@ -4,8 +4,6 @@ import numpy as np
 
 from . import DataPreprocessorBase
 
-# TODO improve to parse n values from string
-
 
 class BasicDataPreprocessor(DataPreprocessorBase):
     """
@@ -28,9 +26,16 @@ class BasicDataPreprocessor(DataPreprocessorBase):
         # Parse string input (e.g., "yaw,pitch,roll")
         if isinstance(sensor_data, str):
             try:
-                values = list(map(float, sensor_data.split(",")))[0:n]
+                parts = sensor_data.split(",")
+                selected_parts = parts[:n]
+                values = [float(p) for p in selected_parts]
+                while len(values) < n:
+                    values.append(0.0)
+            except ValueError:
+                # Default to zero values
+                values = [0.0] * n
             except Exception:
-                # If parsing fails, default to zero values
+                # Default to zero values
                 values = [0.0] * n
 
         elif isinstance(sensor_data, (list, tuple, np.ndarray)):
@@ -43,7 +48,7 @@ class BasicDataPreprocessor(DataPreprocessorBase):
         # Quantize values and apply threshold filtering
         quantized = []
         for v in values:
-            qv = round(v / self.quantum) * self.quantum  # quantize to nearest step
+            qv = round(v / self.quantum) * self.quantum
             if abs(qv) <= self.min_threshold:
                 qv = 0.0  # zero-out small values
             quantized.append(qv)

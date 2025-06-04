@@ -19,6 +19,21 @@ dependencies = [
     "gymnasium[mujoco]",
     "pyserial==3.5",
 ]
+
 [tool.setuptools.packages.find]
 include = ["morph_drive*"]
 exclude = ["envs*"]
+
+[tool.coverage.run]
+branch = true
+source = ["tests"]
+
+[tool.coverage.report]
+show_missing = true
+omit = ["*.html", "__init__.py"]
+
+[dependency-groups]
+dev = ["coverage>=7.8.2"]
+
+[tool.coverage.html]
+directory = "coverage_report"
