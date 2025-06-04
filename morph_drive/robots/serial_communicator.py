@@ -6,6 +6,7 @@ from typing import Optional, Type
 import serial
 
 
+# Note: Temporary removed
 class SerialCommunicator:
     def __init__(
         self, port: str, baud_rate: int, timeout: float, logger: logging.Logger

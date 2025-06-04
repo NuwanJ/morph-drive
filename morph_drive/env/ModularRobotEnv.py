@@ -27,7 +27,7 @@ class ModularRobotEnv(gym.Env):
         termination_condition: Callable | None = None,
         truncation_condition: Callable | None = None,
         goal: np.ndarray | None = None,
-        configs: dict[str, Any] | None = None
+        configs: dict[str, Any] | None = None,
     ):
         """
         Initialize the modular environment.
@@ -54,7 +54,6 @@ class ModularRobotEnv(gym.Env):
 
         self.step_count = 0
         self.configs = configs or {}
-
 
     def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
         """
