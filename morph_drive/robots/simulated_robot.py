@@ -102,13 +102,16 @@ class SimRobot(RobotInterface, MujocoEnv, utils.EzPickle):
             if isinstance(init_position, (list, tuple)):
                 self.position = [int(v) for v in init_position]
             else:
-                raise ValueError("Invalid type for 'init_position'. Expected list, or tuple.")
+                raise ValueError(
+                    "Invalid type for 'init_position'. Expected list, or tuple."
+                )
         else:
-            if self.action_space and hasattr(self.action_space, 'shape'):
-                self.position = [0] * self.action_space.shape[0] # type: ignore
+            if self.action_space and hasattr(self.action_space, "shape"):
+                self.position = [0] * self.action_space.shape[0]  # type: ignore
             else:
-                raise ValueError("Action space must be properly initialized with a valid shape.")
-
+                raise ValueError(
+                    "Action space must be properly initialized with a valid shape."
+                )
 
     def get_observation_space(self) -> gymnasium.spaces.Space:
         """

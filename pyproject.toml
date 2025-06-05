@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 license = "Apache-2.0"
 
 name = "morph-drive"
-version = "0.2.2"
+version = "0.2.5"
 description = "A package for morph-drive algorithms in origami robotics"
 authors = [{ name = "Nuwan Jaliyagoda", email = "nuwan.jaliyagoda@gmail.com" }]
 readme = "README.md"
@@ -19,6 +19,21 @@ dependencies = [
     "gymnasium[mujoco]",
     "pyserial==3.5",
 ]
+
 [tool.setuptools.packages.find]
 include = ["morph_drive*"]
 exclude = ["envs*"]
+
+[tool.coverage.run]
+branch = true
+source = ["tests"]
+
+[tool.coverage.report]
+show_missing = true
+omit = ["*.html", "__init__.py"]
+
+[dependency-groups]
+dev = ["coverage>=7.8.2"]
+
+[tool.coverage.html]
+directory = "coverage_report"

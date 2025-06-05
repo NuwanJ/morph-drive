@@ -19,7 +19,7 @@ class PhyRobot(RobotInterface):
     """
 
     # Only as per required by Gym interface
-    metadata = {"render_modes": ["human"], 'render_fps': 30}
+    metadata = {"render_modes": ["human"], "render_fps": 30}
 
     observation_space: gymnasium.spaces.Space
     action_space: gymnasium.spaces.Space
@@ -67,13 +67,16 @@ class PhyRobot(RobotInterface):
             if isinstance(init_position, (list, tuple)):
                 self.position = [int(v) for v in init_position]
             else:
-                raise ValueError("Invalid type for 'init_position'. Expected list, or tuple.")
+                raise ValueError(
+                    "Invalid type for 'init_position'. Expected list, or tuple."
+                )
         else:
-            if self.action_space and hasattr(self.action_space, 'shape'):
+            if self.action_space and hasattr(self.action_space, "shape"):
                 self.position = [0] * self.action_space.shape[0]  # type: ignore
             else:
-                raise ValueError("Action space must be properly initialized with a valid shape.")
-
+                raise ValueError(
+                    "Action space must be properly initialized with a valid shape."
+                )
 
     def get_observation_space(self) -> gymnasium.spaces.Space:
         """
@@ -114,7 +117,9 @@ class PhyRobot(RobotInterface):
             sleep(0.1)
             attempts += 1
         if attempts >= max_attempts:
-            self.logger.warning("Exceeded maximum attempts while waiting for response to", actuator_cmd)
+            self.logger.warning(
+                "Exceeded maximum attempts while waiting for response to", actuator_cmd
+            )
 
         self.render()
 
@@ -290,106 +295,3 @@ class PhyRobot(RobotInterface):
 
     def __del__(self) -> None:
         self.close()
-
-
-# ----------------------------------
-# def reset(self) -> None:
-#     """
-#     Reset the robot to the default position (as defined in Robot.reset_position).
-#     """
-#     if self.robot is None:
-#         return
-
-#     # Reset servos to initial positions (Robot.reset sends servos to reset_position and returns those angles)
-#     initial_angles = self.robot.reset()  # e.g., [65, 65, 65]
-#     self._m1_angle, self._m2_angle, self._m3_angle = initial_angles
-
-#     # Allow time for the robot to reach the position and stabilize
-#     time.sleep(1.0)
-
-#     # Flush any buffered input data from the robot
-#     self.robot.flush_input()
-
-# def apply_action(self, action: Any) -> None:
-#     """
-#     Apply a discrete action to the robot by adjusting servo angles.
-#     """
-
-#     # Ensure action has three components
-#     try:
-#         a0, a1, a2 = action
-#     except Exception as e:
-#         raise ValueError(
-#             "Action must be an iterable of three values (for 3 servos)."
-#         ) from e
-
-#     # Map each discrete value {0,1,2} to an increment {-1,0,+1}
-#     increments = [int(val) - 1 for val in (a0, a1, a2)]
-
-#     # Define servo step size in degrees for each increment unit
-#     servo_step = (
-#         -3
-#     )  # using a negative step so that 0->+1 increment, 2->-1 increment (per design choice)
-
-#     # Update each servo angle and clamp within safe bounds [45, 110] degrees
-#     self._m1_angle = int(
-#         np.clip(self._m1_angle + increments[0] * servo_step, 45, 110)
-#     )
-#     self._m2_angle = int(
-#         np.clip(self._m2_angle + increments[1] * servo_step, 45, 110)
-#     )
-#     self._m3_angle = int(
-#         np.clip(self._m3_angle + increments[2] * servo_step, 45, 110)
-#     )
-
-#     # Send the movement command to the physical robot
-#     # (non-blocking or blocking until move complete as implemented in Robot)
-#     self.robot.send_movement(self._m1_angle, self._m2_angle, self._m3_angle)
-
-#     # TODO handle this
-
-#     # # Store the returns from the step
-#     # self._last_obs = obs
-#     # self._reward = reward
-#     # self._done = done
-#     # self._truncated = truncated
-#     # self._info = info
-
-# def get_sensor_data(self) -> str | None:
-#     """
-#     Retrieve raw sensor readings from the robot (e.g., yaw, pitch, roll angles as a comma-separated string).
-#     """
-#     if self.robot is None:
-#         return None
-
-#     # Send command to retrieve orientation data (assuming "C2" triggers the robot to respond with yaw,pitch,roll)
-#     return self.robot.send_command_return_response("C2")
-
-# def close(self) -> None:
-#     """
-#     Close the connection to the robot.
-#     """
-#     if self.robot:
-#         self.robot.close()
-
-# def render(self) -> None:
-#     """
-#     For a real robot, print the current servo angles as a simple form of feedback.
-#     """
-#     print(
-#         f"[Robot] Servo angles: M1={self._m1_angle}, M2={self._m2_angle}, M3={self._m3_angle}"
-#     )
-
-
-# def send_command_return_response(self, command: str) -> Optional[str]:
-#     """Send a command and return the response."""
-#     self.write(f"{command}\n")
-#     return self.read()
-
-# def send_movement(self, value_1: int, value_2: int, value_3: int) -> None:
-#     """Send a movement command."""
-#     self.write(f"W {value_1} {value_2} {value_3}\n")
-#     while self._read_raw() == "OK":
-#         sleep(0.1)
-#         sleep(0.1)
-#         sleep(0.1)
